@@ -893,7 +893,6 @@ const 전문 = (c) => {
 
 const pad5 = (n) => String(n).padStart(5, "0");
 const cols = [...document.querySelectorAll("#cols .col")];
-const 높이 = [0, 0];
 let total = 0, ended = false, busy = false, 열린카드 = null;
 
 const el = (tag, cls, txt) => {
@@ -938,8 +937,8 @@ function add(k) {
   for (let i = 0; i < k; i++) {
     const c = 카드();
     if (!c) { 종료(); return; }
-    const t = 높이[0] <= 높이[1] ? 0 : 1;
-    높이[t] += c.h;
+    const a = cols[0].offsetHeight, b = cols[1].offsetHeight;
+    const t = a <= b ? 0 : 1;
     cols[t].appendChild(카드요소(c));
     total++;
   }
