@@ -1,5 +1,68 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>예술전시 언어 생성기</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  body{background:#fff;color:#000;min-height:100vh;
+    font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
+  .mj{font-family:'Nanum Myeongjo','Apple Myungjo',AppleMyungjo,Batang,'Times New Roman',serif}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  #bar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1.5px solid #000;
+    display:flex;align-items:baseline;gap:8px;padding:9px 10px}
+  #bar h1{font-size:11px;letter-spacing:.16em;font-weight:600}
+  #count{font-size:10px;margin-left:auto;letter-spacing:.1em}
+  button{border:1px solid #000;background:#fff;color:#000;font-size:9.5px;
+    letter-spacing:.12em;padding:3px 7px;cursor:pointer;font-family:inherit}
+  #cols{display:flex;align-items:flex-start}
+  .col{flex:1 1 0;min-width:0}
+  .card{border-right:1.5px solid #000;border-bottom:1.5px solid #000;padding:12px 10px 14px;
+    cursor:pointer;overflow:hidden}
+  .col:last-child .card{border-right:none}
+  .n{font-size:8px;letter-spacing:.18em;margin-bottom:7px;opacity:.55}
+  .tit{font-size:13.5px;line-height:1.35;margin-bottom:6px;word-break:keep-all}
+  .big{font-size:20px;line-height:1.24;margin:14px 0 20px;word-break:keep-all}
+  .meta{font-size:8.5px;line-height:1.75;letter-spacing:.02em;opacity:.75}
+  .body{font-size:10.5px;line-height:1.85;text-align:justify;word-break:keep-all;margin-top:8px}
+  .rule{border:none;border-top:0.5px solid #000;margin:10px 0 9px}
+  .tag{font-size:9px;line-height:2.1;letter-spacing:.05em}
+  .frag{font-size:12px;line-height:1.7;letter-spacing:.08em;min-height:26px;word-break:break-all}
+  .last{font-size:11px;margin-top:10px;letter-spacing:.04em}
+  .void{min-height:52px}
+  #foot{padding:24px 12px 44px;text-align:center;font-size:9px;letter-spacing:.2em;opacity:.5}
+  .fin{border-top:1.5px solid #000;padding:120px 20px 150px;text-align:center}
+  .fin .b{font-size:15px;line-height:2.1;word-break:keep-all}
+  #ov{position:fixed;inset:0;background:#fff;z-index:40;overflow:auto;padding:56px 22px 80px;display:none}
+  #ov.on{display:block}
+  #ov .t{font-size:24px;line-height:1.3;margin-bottom:14px;word-break:keep-all}
+  #ov .m{font-size:11px;line-height:2;letter-spacing:.03em}
+  #ov .b{font-size:14.5px;line-height:2.05;text-align:justify;word-break:keep-all;margin-top:22px}
+  #x{position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:1.5px solid #000;
+    display:flex;justify-content:space-between;padding:9px 10px;z-index:41}
+</style>
+</head>
+<body>
 
+<div id="bar">
+  <h1>예술전시 언어 생성기</h1>
+  <span id="count" class="mono">누적 00000</span>
+</div>
+
+<div id="cols"><div class="col"></div><div class="col"></div></div>
+<div id="foot" class="mono">↓ 계속 생산됨</div>
+
+<div id="ov">
+  <div id="x">
+    <button id="copy" class="mono">전문 복사</button>
+    <button id="close" class="mono">닫기</button>
+  </div>
+  <div id="ovbody"></div>
+</div>
+
+<script>
+/* ══ 생성 엔진 ══ */
 /* ── 어휘 ─────────────────────────────────────────── */
 
 const 서두 = [
@@ -825,204 +888,118 @@ const 전문 = (c) => {
   return c.text ? `${cap}\n\n${c.text}` : c.tags ? `${cap}\n\n${c.tags.join(" / ")}` : cap;
 };
 
-/* ── UI ───────────────────────────────────────────── */
 
-const css = `
-.gen *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-.gen{background:#fff;color:#000;min-height:100vh;
-  font-family:'Apple SD Gothic Neo','Noto Sans KR',sans-serif;}
-.mj{font-family:'Nanum Myeongjo','Apple Myungjo',AppleMyungjo,Batang,'Times New Roman',serif}
-.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-.bar{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1.5px solid #000;
-  display:flex;align-items:baseline;gap:8px;padding:9px 10px}
-.bar h1{font-size:11px;letter-spacing:.16em;margin:0;font-weight:600}
-.count{font-size:10px;margin-left:auto;letter-spacing:.1em}
-.btn{border:1px solid #000;background:#fff;color:#000;font-size:9.5px;
-  letter-spacing:.12em;padding:3px 7px;cursor:pointer}
-.cols{display:flex;gap:0;align-items:flex-start}
-.col{flex:1 1 0;min-width:0}
-.card{border-right:1.5px solid #000;border-bottom:1.5px solid #000;padding:12px 10px 14px;
-  cursor:pointer;overflow:hidden}
-.col:last-child .card{border-right:none}
-.n{font-size:8px;letter-spacing:.18em;margin-bottom:7px;opacity:.55}
-.tit{font-size:13.5px;line-height:1.35;margin-bottom:6px;word-break:keep-all}
-.big{font-size:20px;line-height:1.24;margin:14px 0 20px;word-break:keep-all}
-.meta{font-size:8.5px;line-height:1.75;letter-spacing:.02em;opacity:.75}
-.body{font-size:10.5px;line-height:1.85;text-align:justify;word-break:keep-all;margin-top:8px}
-.rule{border:none;border-top:0.5px solid #000;margin:10px 0 9px}
-.tag{font-size:9px;line-height:2.1;letter-spacing:.05em}
-.frag{font-size:12px;line-height:1.7;letter-spacing:.08em;min-height:26px}
-.last{font-size:11px;margin-top:10px;letter-spacing:.04em}
-.void{min-height:52px}
-.foot{padding:24px 12px 44px;text-align:center;font-size:9px;letter-spacing:.2em;opacity:.5}
-.fin{border-top:1.5px solid #000;padding:110px 20px 140px;text-align:center}
-.fin .a{font-size:9px;letter-spacing:.3em;margin-bottom:26px}
-.fin .b{font-size:15px;line-height:2.1;word-break:keep-all}
-.fin .c{font-size:9px;letter-spacing:.14em;margin-top:34px;opacity:.55}
-.ov{position:fixed;inset:0;background:#fff;z-index:40;overflow:auto;padding:56px 22px 80px}
-.ov .t{font-size:24px;line-height:1.3;margin-bottom:14px;word-break:keep-all}
-.ov .m{font-size:11px;line-height:2;letter-spacing:.03em}
-.ov .b{font-size:14.5px;line-height:2.05;text-align:justify;word-break:keep-all;margin-top:22px}
-.x{position:fixed;top:0;left:0;right:0;background:#fff;border-bottom:1.5px solid #000;
-  display:flex;justify-content:space-between;padding:9px 10px;z-index:41}
-`;
+/* ══ 화면 ══ */
 
 const pad5 = (n) => String(n).padStart(5, "0");
+const cols = [...document.querySelectorAll("#cols .col")];
+const 높이 = [0, 0];
+let total = 0, ended = false, busy = false, 열린카드 = null;
 
-const Card = memo(function Card({ c, onOpen }) {
+const el = (tag, cls, txt) => {
+  const d = document.createElement(tag);
+  if (cls) d.className = cls;
+  if (txt != null) d.textContent = txt;
+  return d;
+};
+
+function 카드요소(c) {
+  const box = el("div", "card");
+  box.appendChild(el("div", "n mono", "№ " + pad5(c.n)));
+
   if (c.kind === "void") {
-    return (
-      <div className="card void" onClick={() => onOpen(c)}>
-        <div className="n mono">№ {pad5(c.n)}</div>
-        {c.last && <div className="last mj">{c.last}</div>}
-      </div>
-    );
+    box.classList.add("void");
+    if (c.last) box.appendChild(el("div", "last mj", c.last));
+  } else if (c.kind === "ruin") {
+    box.appendChild(el("div", c.mono ? "frag mono" : "frag mj", c.frag));
+  } else if (c.kind === "raw") {
+    box.appendChild(el("div", "body mj", c.text));
+  } else {
+    box.appendChild(el("div", (c.kind === "title" ? "big mj" : "tit mj"), "〈" + c.cap.title + "〉"));
+    if (c.kind !== "line") {
+      const m = el("div", "meta mono");
+      m.innerHTML = "";
+      [c.cap.medium, c.cap.size, c.cap.year, c.cap.edition].forEach((v, i) => {
+        if (!v) return;
+        if (i) m.appendChild(document.createElement("br"));
+        m.appendChild(document.createTextNode(v));
+      });
+      box.appendChild(m);
+    }
+    if (c.text) { box.appendChild(el("hr", "rule")); box.appendChild(el("div", "body mj", c.text)); }
+    if (c.tags) { box.appendChild(el("hr", "rule")); box.appendChild(el("div", "tag mono", c.tags.join(" / "))); }
   }
-  if (c.kind === "ruin") {
-    return (
-      <div className="card" onClick={() => onOpen(c)}>
-        <div className="n mono">№ {pad5(c.n)}</div>
-        <div className={c.mono ? "frag mono" : "frag mj"}>{c.frag}</div>
-      </div>
-    );
+
+  box.addEventListener("click", () => 펼치기(c));
+  return box;
+}
+
+function add(k) {
+  for (let i = 0; i < k; i++) {
+    const c = 카드();
+    if (!c) { 종료(); return; }
+    const t = 높이[0] <= 높이[1] ? 0 : 1;
+    높이[t] += c.h;
+    cols[t].appendChild(카드요소(c));
+    total++;
   }
-  if (c.kind === "raw") {
-    return (
-      <div className="card" onClick={() => onOpen(c)}>
-        <div className="n mono">№ {pad5(c.n)}</div>
-        <div className="body mj">{c.text}</div>
-      </div>
-    );
+  document.getElementById("count").textContent = "누적 " + pad5(Math.min(total, 공백 - 1));
+}
+
+function 종료() {
+  if (ended) return;
+  ended = true;
+  const f = document.getElementById("foot");
+  f.className = "fin";
+  f.innerHTML = "";
+  f.appendChild(el("div", "b mj", "예정된 전시가 없습니다."));
+}
+
+const ov = document.getElementById("ov");
+const ovbody = document.getElementById("ovbody");
+
+function 펼치기(c) {
+  열린카드 = c;
+  ovbody.innerHTML = "";
+  ovbody.appendChild(el("div", "n mono", "№ " + pad5(c.n)));
+  if (c.cap) {
+    ovbody.appendChild(el("div", "t mj", "〈" + c.cap.title + "〉"));
+    const m = el("div", "m mono");
+    [c.cap.medium, c.cap.size, c.cap.year, c.cap.edition].forEach((v, i) => {
+      if (!v) return;
+      if (i) m.appendChild(document.createElement("br"));
+      m.appendChild(document.createTextNode(v));
+    });
+    ovbody.appendChild(m);
+  } else {
+    ovbody.appendChild(el("div", "t mj", c.frag || c.text || "＿"));
   }
-  return (
-    <div className="card" onClick={() => onOpen(c)}>
-      <div className="n mono">№ {pad5(c.n)}</div>
-      <div className={c.kind === "title" ? "big mj" : "tit mj"}>〈{c.cap.title}〉</div>
-      {c.kind !== "line" && (
-        <div className="meta mono">
-          {c.cap.medium}<br />{c.cap.size}<br />{c.cap.year}
-          {c.cap.edition ? <><br />{c.cap.edition}</> : null}
-        </div>
-      )}
-      {c.text && (
-        <>
-          <hr className="rule" />
-          <div className="body mj">{c.text}</div>
-        </>
-      )}
-      {c.tags && (
-        <>
-          <hr className="rule" />
-          <div className="tag mono">{c.tags.join(" / ")}</div>
-        </>
-      )}
-    </div>
-  );
+  if (c.cap && c.text) ovbody.appendChild(el("div", "b mj", c.text));
+  if (c.tags) ovbody.appendChild(el("div", "b mono", c.tags.join(" / ")));
+  ov.classList.add("on");
+  window.scrollTo(0, window.scrollY);
+}
+
+document.getElementById("close").addEventListener("click", () => ov.classList.remove("on"));
+ov.addEventListener("click", (e) => { if (e.target === ov) ov.classList.remove("on"); });
+document.getElementById("copy").addEventListener("click", async () => {
+  const b = document.getElementById("copy");
+  try {
+    await navigator.clipboard.writeText(전문(열린카드));
+    b.textContent = "복사됨";
+    setTimeout(() => { b.textContent = "전문 복사"; }, 1400);
+  } catch (e) { b.textContent = "복사 불가"; }
 });
 
-export default function App() {
-  const [cols, setCols] = useState([[], []]);
-  const [total, setTotal] = useState(0);
-  const [ended, setEnded] = useState(false);
-  const [open, setOpen] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const h = useRef([0, 0]);
-  const busy = useRef(false);
+window.addEventListener("scroll", () => {
+  if (busy || ended || ov.classList.contains("on")) return;
+  if (window.innerHeight + window.scrollY < document.body.offsetHeight - 900) return;
+  busy = true;
+  add(8);
+  setTimeout(() => { busy = false; }, 120);
+}, { passive: true });
 
-  const add = useCallback((k) => {
-    const made = [];
-    for (let i = 0; i < k; i++) {
-      const c = 카드();
-      if (!c) { setEnded(true); break; }
-      made.push(c);
-    }
-    if (!made.length) return;
-    setCols((prev) => {
-      const next = [prev[0].slice(), prev[1].slice()];
-      for (const c of made) {
-        const t = h.current[0] <= h.current[1] ? 0 : 1;
-        h.current[t] += c.h;
-        next[t].push(c);
-      }
-      return next;
-    });
-    setTotal((t) => t + made.length);
-  }, []);
-
-  useEffect(() => { add(14); }, [add]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      if (busy.current || open || ended) return;
-      const near = window.innerHeight + window.scrollY > document.body.offsetHeight - 900;
-      if (!near) return;
-      busy.current = true;
-      add(8);
-      setTimeout(() => { busy.current = false; }, 120);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [add, open, ended]);
-
-  const copy = async (c) => {
-    try {
-      await navigator.clipboard.writeText(전문(c));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1400);
-    } catch (e) { /* 클립보드 사용 불가 */ }
-  };
-
-  const handleOpen = useCallback((c) => setOpen(c), []);
-
-  return (
-    <div className="gen">
-      <style>{css}</style>
-
-      <div className="bar">
-        <h1>예술전시 언어 생성기</h1>
-        <span className="count mono">누적 {pad5(Math.min(total, 공백 - 1))}</span>
-      </div>
-
-      <div className="cols">
-        {cols.map((col, i) => (
-          <div className="col" key={i}>
-            {col.map((c) => <Card c={c} key={c.id} onOpen={handleOpen} />)}
-          </div>
-        ))}
-      </div>
-
-      {ended ? (
-        <div className="fin">
-          <div className="b mj">예정된 전시가 없습니다.</div>
-        </div>
-      ) : (
-        <div className="foot mono">↓ 계속 생산됨</div>
-      )}
-
-      {open && (
-        <div className="ov" onClick={() => setOpen(null)}>
-          <div className="x">
-            <button className="btn mono" onClick={(e) => { e.stopPropagation(); copy(open); }}>
-              {copied ? "복사됨" : "전문 복사"}
-            </button>
-            <button className="btn mono" onClick={() => setOpen(null)}>닫기</button>
-          </div>
-          <div className="n mono">№ {pad5(open.n)}</div>
-          {open.cap ? (
-            <>
-              <div className="t mj">〈{open.cap.title}〉</div>
-              <div className="m mono">
-                {open.cap.medium}<br />{open.cap.size}<br />{open.cap.year}
-                {open.cap.edition ? <><br />{open.cap.edition}</> : null}
-              </div>
-            </>
-          ) : (
-            <div className="t mj">{open.frag || "＿"}</div>
-          )}
-          {open.text && <div className="b mj">{open.text}</div>}
-          {open.tags && <div className="b mono" style={{ fontSize: 13 }}>{open.tags.join(" / ")}</div>}
-        </div>
-      )}
-    </div>
-  );
-}
+add(14);
+</script>
+</body>
+</html>
